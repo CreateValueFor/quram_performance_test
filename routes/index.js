@@ -27,8 +27,8 @@ const IDCARD_TYPE = {
 router.get('/', async function (req, res, next) {
   
 
-  const fileList = fs.readdirSync(__dirname + '/../img_files');
-  // .filter((item) => item.includes('.png'));
+  const fileList = fs.readdirSync(__dirname + '/../img_files')
+  .filter((item) => item.includes('.jpg') || item.includes('.jpeg'));
 
   
 
