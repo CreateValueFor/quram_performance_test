@@ -186,7 +186,8 @@ router.get('/', async function (req, res, next) {
                     .catch(async function(error){
                       console.log("ocr 실패");
                       console.log(error.response?.data);
-                      logData.ocr = {}
+                      logData.ocr = {success:false, message:"OCR 감지 실패"}
+                      route = null
                     })                    
                   }
                 })
@@ -199,12 +200,16 @@ router.get('/', async function (req, res, next) {
                 });
           }
 
-          const { data: status_result } = await status.post(
-            route,
-            request_body
-          );
-          console.log(status_result);
-          logData.status = status_result;
+          if(route !== null){
+            const { data: status_result } = await status.post(
+              route,
+              request_body
+            );
+            console.log(status_result);
+            logData.status = status_result;
+          }
+
+          
         })
         .catch(function (error) {
           logData.status = { success:false, error: error.response?.data };

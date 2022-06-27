@@ -3,3 +3,7 @@ img_files
 logs/
 .idea/
 package-lock.json
+
+
+# result 
+test.js
