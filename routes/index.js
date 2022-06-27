@@ -30,7 +30,8 @@ router.get('/', async function (req, res, next) {
   const fileList = fs.readdirSync(__dirname + '/../img_files')
   .filter((item) => item.includes('.jpg') || item.includes('.jpeg'));
 
-  
+  let interval;
+  let count = 0;
 
   const {
     data: { jwt: token },
@@ -46,75 +47,98 @@ router.get('/', async function (req, res, next) {
   
 
   try {
-    await Promise.all(
-      fileList.map(async (file) => {
 
-        const logData = {};
+    interval = setInterval(async function(){
+      console.log("반복 실행 중")
+      if(count >= fileList.length){
+        return clearInterval(interval)
+      }
+      const logData = {};
 
 
-        var data = new FormData();
-        data.append('files', fs.createReadStream(`img_files/${file}`));
-        var config = {
-          method: 'post',
-          url: QURAM_SERVER,
-          headers: {
-            ...data.getHeaders(),
-          },
-          data: data,
-        };
+      var data = new FormData();
+      const file = fileList[count]
+      count += 1;
+      data.append('files', fs.createReadStream(`img_files/${file}`));
+      var config = {
+        method: 'post',
+        url: QURAM_SERVER,
+        headers: {
+          ...data.getHeaders(),
+        },
+        data: data,
+      };
 
-        await axios(config)
-          .then(async function (response) {
-            const { result_scan_type: idcard_type, id: ocr_result } =
-              response.data;
-              logData.ocr = ocr_result
-            let request_body;
-            switch (idcard_type) {
-              case IDCARD_TYPE.IDCARD.name:
-                request_body = {
-                  identity: ocr_result.jumin.replaceAll('-',""),
-                  issueDate: ocr_result.issued_date.replaceAll('.',"") ,
-                  userName:ocr_result.name
-                }
-                const { data : idcard_result} =  await axios.post(USEB_STATUS_SERVER + IDCARD_TYPE.IDCARD.route, request_body,
-                    {headers:{
-                      Authorization: `Bearer ${token}`
-                    }}
-                    )
-                    logData.status = idcard_result
-                console.log(idcard_result)
+      await axios(config)
+        .then(async function (response) {
+          const { result_scan_type: idcard_type, id: ocr_result } =
+            response.data;
+            logData.ocr = ocr_result
+            
 
-                break;
-              case IDCARD_TYPE.DRIVER.name:
-                
 
-                request_body = {
-                  licenseNo: ocr_result.driver_license.driver_number,
-                  birthDate: '19' + ocr_result.jumin.split('-')[0] ,
-                  userName:ocr_result.name
-                }
-                
-                const { data : drvier_result} =  await axios.post(USEB_STATUS_SERVER + IDCARD_TYPE.DRIVER.route, request_body,
-                    {headers:{
-                      Authorization: `Bearer ${token}`
-                    }}
-                    )
-                console.log(drvier_result)
-                logData.status = drvier_result
-                break;
-              default:
-                console.log("운전면허증 또는 주민등록증이 아님")
-            }
+          let request_body;
+          switch (idcard_type) {
+            case IDCARD_TYPE.IDCARD.name:
+              request_body = {
+                identity: ocr_result.jumin.replaceAll('-',""),
+                issueDate: ocr_result.issued_date.replaceAll('.',"") ,
+                userName:ocr_result.name
+              }
+              const { data : idcard_result} =  await axios.post(USEB_STATUS_SERVER + IDCARD_TYPE.IDCARD.route, request_body,
+                  {headers:{
+                    Authorization: `Bearer ${token}`
+                  }}
+                  )
+                  logData.status = idcard_result
+              console.log(idcard_result)
 
-          })
-          .catch(function (error) {
-            console.log('error is', error);
-          });
+              break;
+            case IDCARD_TYPE.DRIVER.name:
+              
 
-          logger.info(JSON.stringify(logData))
+              request_body = {
+                licenseNo: ocr_result.driver_license.driver_number,
+                birthDate: '19' + ocr_result.jumin.split('-')[0] ,
+                userName:ocr_result.name
+              }
+              
+              const { data : drvier_result} =  await axios.post(USEB_STATUS_SERVER + IDCARD_TYPE.DRIVER.route, request_body,
+                  {headers:{
+                    Authorization: `Bearer ${token}`
+                  }}
+                  )
+              console.log(drvier_result)
+              logData.status = drvier_result
+              break;
+            default:
+              logData.success = false,
+              logData.error = "운전면허증 또는 주민등록증이 아님"
+              
+          }
 
-      })
-    );
+        })
+        .catch(function (error) {
+          console.log('error is', error);
+        });
+        await fs.appendFileSync("./test.txt", ","+ JSON.stringify(logData), err => {
+          if(err){
+            console.error(err)
+            return
+          }
+        })
+        // logger.info(JSON.stringify(logData))
+
+    }, 1000)
+
+
+    // await Promise.all(
+    //   fileList.map(async (file,idx) => {
+
+       
+
+    //   })
+    // );
   } catch (err) {
     if (err && err.response) {
       console.log(err.response.data);
