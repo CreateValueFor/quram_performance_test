@@ -107,6 +107,7 @@ router.get('/', async function (req, res, next) {
               route = IDCARD_TYPE.DRIVER.route;
               break;
             default:
+              console.log("id-auto 인식 실패")
               var data = new FormData();
               data.append('files', fs.createReadStream(`img_files/${file}`));
               let config = {
@@ -151,6 +152,7 @@ router.get('/', async function (req, res, next) {
                     console.log('해외 여권');
                   } else {
                     // 여권이 아닌 경우
+                    console.log("passport 인식 실패")
                     
                     var data = new FormData();
                     data.append(
@@ -170,7 +172,6 @@ router.get('/', async function (req, res, next) {
                     .then(async function (response) {
                       const { id: alien } = response.data;
                       logData.ocr = alien;
-                      console.log(alien)
                       if (
                         response.data?.result_scan_type ===
                         IDCARD_TYPE.ALIEN.name
@@ -181,13 +182,18 @@ router.get('/', async function (req, res, next) {
                           issueDate : alien.issued_date.replaceAll(".", "")
                         }
                         route = IDCARD_TYPE.ALIEN.route
+                      }else {
+                        logData.ocr = {success:false, message:"OCR 감지 실패"}
+                        route = ""  
                       }
                     })
                     .catch(async function(error){
                       console.log("ocr 실패");
-                      console.log(error.response?.data);
-                      logData.ocr = {success:false, message:"OCR 감지 실패"}
-                      route = null
+                      logData.ocr = {
+                        success: false,
+                        resonse_data: error.response.data,
+                      };
+                      route = ""
                     })                    
                   }
                 })
@@ -197,10 +203,11 @@ router.get('/', async function (req, res, next) {
                     success: false,
                     resonse_data: error.response.data,
                   };
+                  route = ""
                 });
           }
 
-          if(route !== null){
+          if(route !== ""){
             const { data: status_result } = await status.post(
               route,
               request_body
