@@ -7,27 +7,25 @@ const FormData = require('form-data');
 const { dirname } = require('path');
 const logger = require('../winston');
 
-
-
 const QURAM_SERVER =
   'http://ec2-3-35-3-47.ap-northeast-2.compute.amazonaws.com:9091/scan/';
 const USEB_AUTH_SERVER = 'https://auth.useb.co.kr/oauth/token';
-const USEB_STATUS_SERVER = "https://api3.useb.co.kr/status/"
+const USEB_STATUS_SERVER = 'https://api3.useb.co.kr/status/';
 const USEB_TOKEN =
   'YTk4ZTM4MzI4NjliZTlhOGM3YTFmMDc5ZDI0MTBiYzk6MGMwNmEyOGVjNzQxNGE5ZjM5Zjc2MDI0NDU5NGFmMDY';
 const IDCARD_TYPE = {
-  DRIVER: { name:  'DRIVER_LICENSE', route: "driver"},
-  IDCARD: {name:'RESIDENT_REGISTRATION', route: 'idcard'},
-  PASSPORT: {name:'PASSPORT', route: 'passport'},
-  ALIEN: {name:'외국인등록증', route: 'alien'},
+  DRIVER: { name: 'DRIVER_LICENSE', route: 'driver' },
+  IDCARD: { name: 'RESIDENT_REGISTRATION', route: 'idcard' },
+  PASSPORT: { name: 'PASSPORT', route: 'passport' },
+  PASSPORT_OVERSEAS: { name: 'PASSPORT_OVERSEAS', route: 'passport-overseas' },
+  ALIEN: { name: 'ALIEN_REGISTRATION', route: 'alien' },
 };
-
 
 /* GET home page. */
 router.get('/', async function (req, res, next) {
-
-  const fileList = fs.readdirSync(__dirname + '/../img_files')
-  .filter((item) => item.includes('.jpg') || item.includes('.jpeg'));
+  const fileList = fs
+    .readdirSync(__dirname + '/../img_files')
+    .filter((item) => item.includes('.jpg') || item.includes('.jpeg'));
 
   let interval;
   let count = 0;
@@ -48,33 +46,32 @@ router.get('/', async function (req, res, next) {
   // create axios instance to use Useb Api Token
   const status = axios.create({
     baseURL: USEB_STATUS_SERVER,
-    headers:{
+    headers: {
       common: {
-        Authorization: `Bearer ${token}`  
-      }
-    }
-  })
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
 
   try {
-     async function performanceTest(){
-      
-      if(count >= fileList.length){
-        console.log("반복 완료")
+    async function performanceTest() {
+      if (count >= fileList.length) {
+        console.log('반복 완료');
         return;
       }
-      console.log("반복 실행 중", count + 1 , "번째")
+      console.log('반복 실행 중', count + 1, '번째');
 
       // initialize loop data
       const logData = {};
-      const file = fileList[count]
+      const file = fileList[count];
+      logData.fileName = file
       var data = new FormData();
       data.append('files', fs.createReadStream(`img_files/${file}`));
       count += 1;
-      
-      
+
       let config = {
         method: 'post',
-        url: QURAM_SERVER + "id-auto",
+        url: QURAM_SERVER + 'id-auto',
         headers: {
           ...data.getHeaders(),
         },
@@ -83,122 +80,163 @@ router.get('/', async function (req, res, next) {
 
       await axios(config)
         .then(async function (response) {
-          const { result_scan_type: idcard_type, id: ocr_result } = response.data;
+          const { result_scan_type: idcard_type, id: ocr_result } =
+            response.data;
           logData.ocr = ocr_result
           let request_body;
-          let route = "";
-          
+          let route = '';
 
           switch (idcard_type) {
             case IDCARD_TYPE.IDCARD.name:
-              console.log("주민등록증")
+              console.log('주민등록증');
               request_body = {
-                identity: ocr_result.jumin.replaceAll('-',""),
-                issueDate: ocr_result.issued_date.replaceAll('.',"") ,
-                userName:ocr_result.name
-              }
-              route = IDCARD_TYPE.IDCARD.route
+                identity: ocr_result.jumin.replaceAll('-', ''),
+                issueDate: ocr_result.issued_date.replaceAll('.', ''),
+                userName: ocr_result.name,
+              };
+              route = IDCARD_TYPE.IDCARD.route;
 
               break;
             case IDCARD_TYPE.DRIVER.name:
-              console.log("운전면허증")
+              console.log('운전면허증');
               request_body = {
                 licenseNo: ocr_result.driver_license.driver_number,
-                birthDate: '19' + ocr_result.jumin.split('-')[0] ,
-                userName:ocr_result.name
-              }
-              route = IDCARD_TYPE.DRIVER.route
+                birthDate: '19' + ocr_result.jumin.split('-')[0],
+                userName: ocr_result.name,
+              };
+              route = IDCARD_TYPE.DRIVER.route;
               break;
             default:
-              console.log("주민등록증 혹은 운전면허증이 아님")
               var data = new FormData();
               data.append('files', fs.createReadStream(`img_files/${file}`));
               let config = {
                 method: 'post',
-                url: QURAM_SERVER + "passport",
+                url: QURAM_SERVER + 'passport',
                 headers: {
                   ...data.getHeaders(),
                 },
                 data: data,
               };
 
-
               await axios(config)
-                .then(async function (response){
-                  const {id: passport_result} = response.data;
+                .then(async function (response) {
+                  const { id: passport_result } = response.data;
                   logData.ocr = passport_result;
-                  if(response.data?.result_scan_type === IDCARD_TYPE.PASSPORT.name){
+                  if (
+                    response.data?.result_scan_type ===
+                    IDCARD_TYPE.PASSPORT.name
+                  ) {
+                    // 여권이 맞는 경우
+                    console.log('국내 여권');
                     request_body = {
-                      userName:passport_result.passport.name_kor,
-                      passportNo : passport_result.passport.passport_number,
-                      issueDate: passport_result.issued_date.replaceAll('.',"") ,
-                      expirationDate: passport_result.passport.expiry_date.replaceAll('.',"") ,
-                      birthDate: '19' + passport_result.passport.birthday
-                    }
-                    console.log("request body is ",request_body)
-                    route = IDCARD_TYPE.PASSPORT.route
-                  }else {
-                    logData.ocr = {success : false, error : "운전면허증 또는 주민등록증 또는 여권이 아님", resonse_data : error.response.data, fileName: file};
+                      userName: passport_result.passport.name_kor,
+                      passportNo: passport_result.passport.passport_number,
+                      issueDate: passport_result.issued_date.replaceAll(
+                        '.',
+                        ''
+                      ),
+                      expirationDate:
+                        passport_result.passport.expiry_date.replaceAll(
+                          '.',
+                          ''
+                        ),
+                      birthDate: '19' + passport_result.passport.birthday,
+                    };
+                    console.log('request body is ', request_body);
+                    route = IDCARD_TYPE.PASSPORT.route;
+                  } else if (
+                    response.data?.result_scan_type ===
+                    IDCARD_TYPE.PASSPORT.name
+                  ) {
+                    console.log('해외 여권');
+                  } else {
+                    // 여권이 아닌 경우
+                    
+                    var data = new FormData();
+                    data.append(
+                      'files',
+                      fs.createReadStream(`img_files/${file}`)
+                    );
+                    let config = {
+                      method: 'post',
+                      url: QURAM_SERVER + 'id-alien',
+                      headers: {
+                        ...data.getHeaders(),
+                      },
+                      data: data,
+                    };
+
+                    await axios(config)
+                    .then(async function (response) {
+                      const { id: alien } = response.data;
+                      logData.ocr = alien;
+                      console.log(alien)
+                      if (
+                        response.data?.result_scan_type ===
+                        IDCARD_TYPE.ALIEN.name
+                      ) {
+                        console.log('외국인 등록증');
+                        request_body = {
+                          issueNo : alien.jumin,
+                          issueDate : alien.issued_date.replaceAll(".", "")
+                        }
+                        route = IDCARD_TYPE.ALIEN.route
+                      }
+                    })
+                    .catch(async function(error){
+                      console.log("ocr 실패");
+                      console.log(error.response?.data);
+                      logData.ocr = {}
+                    })                    
                   }
                 })
-                .catch(function (error){
-                  console.log(error.response?.data)
-                  logData.ocr = {success : false, error : "운전면허증 또는 주민등록증이 아님", resonse_data : error.response.data, fileName: file};
-                })
-
-              
+                .catch(function (error) {
+                  console.log(error.response?.data);
+                  logData.ocr = {
+                    success: false,
+                    resonse_data: error.response.data,
+                  };
+                });
           }
-          
-          const { data : status_result } =  await status.post(route, request_body)
-          console.log(status_result)
-          logData.status = status_result;
-          
 
+          const { data: status_result } = await status.post(
+            route,
+            request_body
+          );
+          console.log(status_result);
+          logData.status = status_result;
         })
         .catch(function (error) {
-
-          logData.status = {error: error.response?.data};
+          logData.status = { success:false, error: error.response?.data };
           console.log('error is', error.response?.data);
         });
-        await fs.appendFileSync("./test.txt", ","+ JSON.stringify(logData), err => {
-          if(err){
-            console.error(err)
-            return
+      await fs.appendFileSync(
+        './test.txt',
+        ',' + JSON.stringify(logData),
+        (err) => {
+          if (err) {
+            console.error(err);
+            return;
           }
-        })
-        performanceTest();
-        // logger.info(JSON.stringify(logData))
-
+        }
+      );
+      performanceTest();
+      
     }
-    performanceTest()
+    performanceTest();
 
-
-    // await Promise.all(
-    //   fileList.map(async (file,idx) => {
-
-
-
-    //   })
-    // );
   } catch (err) {
     if (err && err.response) {
       console.log(err.response.data);
-      // return res.json({
-      //   err: err.response
-      // })
     } else {
       console.log('70', err);
     }
   }
 
   console.log(fileList);
-  // const formData = new FormData();
-  // formData.append('file',)
-
-  // await axios.post()
 
   return res.json({
-    data: "hello",
+    data: 'hello',
   });
 });
 
