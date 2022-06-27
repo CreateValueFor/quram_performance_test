@@ -48,10 +48,13 @@ router.get('/', async function (req, res, next) {
 
   try {
 
-    interval = setInterval(async function(){
-      console.log("반복 실행 중")
+    
+
+     async function performanceTest(){
+      console.log("반복 실행 중", count , "번째")
       if(count >= fileList.length){
-        return clearInterval(interval)
+        console.log("반복 완료")
+        return;
       }
       const logData = {};
 
@@ -127,9 +130,11 @@ router.get('/', async function (req, res, next) {
             return
           }
         })
+        performanceTest();
         // logger.info(JSON.stringify(logData))
 
-    }, 1000)
+    }
+    performanceTest()
 
 
     // await Promise.all(
