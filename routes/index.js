@@ -18,6 +18,8 @@ const USEB_TOKEN =
 const IDCARD_TYPE = {
   DRIVER: { name:  'DRIVER_LICENSE', route: "driver"},
   IDCARD: {name:'RESIDENT_REGISTRATION', route: 'idcard'},
+  PASSPORT: {name:'여권', route: 'passport'},
+  ALIEN: {name:'외국인등록증', route: 'alien'},
 };
 
 
@@ -25,7 +27,7 @@ const IDCARD_TYPE = {
 
 /* GET home page. */
 router.get('/', async function (req, res, next) {
-  
+
 
   const fileList = fs.readdirSync(__dirname + '/../img_files')
   .filter((item) => item.includes('.jpg') || item.includes('.jpeg'));
@@ -44,11 +46,11 @@ router.get('/', async function (req, res, next) {
       },
     }
   );
-  
+
 
   try {
 
-    
+
 
      async function performanceTest(){
       console.log("반복 실행 중", count , "번째")
@@ -77,7 +79,7 @@ router.get('/', async function (req, res, next) {
           const { result_scan_type: idcard_type, id: ocr_result } =
             response.data;
             logData.ocr = ocr_result
-            
+
 
 
           let request_body;
@@ -98,14 +100,14 @@ router.get('/', async function (req, res, next) {
 
               break;
             case IDCARD_TYPE.DRIVER.name:
-              
+
 
               request_body = {
                 licenseNo: ocr_result.driver_license.driver_number,
                 birthDate: '19' + ocr_result.jumin.split('-')[0] ,
                 userName:ocr_result.name
               }
-              
+
               const { data : drvier_result} =  await axios.post(USEB_STATUS_SERVER + IDCARD_TYPE.DRIVER.route, request_body,
                   {headers:{
                     Authorization: `Bearer ${token}`
@@ -115,13 +117,12 @@ router.get('/', async function (req, res, next) {
               logData.status = drvier_result
               break;
             default:
-              logData.success = false,
-              logData.error = "운전면허증 또는 주민등록증이 아님"
-              
+              logData.ocr = {success : false, error : "운전면허증 또는 주민등록증이 아님", resonse_data : response.data};
           }
 
         })
         .catch(function (error) {
+          logData.status = {error: error.response?.data};
           console.log('error is', error);
         });
         await fs.appendFileSync("./test.txt", ","+ JSON.stringify(logData), err => {
@@ -140,7 +141,7 @@ router.get('/', async function (req, res, next) {
     // await Promise.all(
     //   fileList.map(async (file,idx) => {
 
-       
+
 
     //   })
     // );

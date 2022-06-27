@@ -1,4 +1,5 @@
 node_modules
 img_files
-logs/*
 logs/
+.idea/
+package-lock.json
